@@ -1,25 +1,185 @@
----
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
+#Reproducible Research: Peer Assessment 1
+==============================================
+
+##Loading and preprocessing the data
+
+```{r read, echo=TRUE}
+#Unzipping the archive
+#unzip("activity.zip")
+#Reading the data
+raw_Data <- read.csv("activity.csv")
+
+#Definig date data as date format
+raw_Data$date <- as.Date(as.character(raw_Data$date))
+```
+
+**Summarizing the Data**
+```{r summarize, echo=TRUE}
+summary(raw_Data)
+```
+
+```{r str, echo=TRUE}
+str(raw_Data)
+```
+
+##What is mean total number of steps taken per day?
+1.Calculate the total number of steps taken per day
+
+```{r aggregation, echo=TRUE}
+#aggregate steps for each day
+steps_Day <- aggregate(raw_Data$steps, by = list(raw_Data$date), sum)
+#definig names
+names(steps_Day) <- c("date", "total.Steps")
+head(steps_Day, 20)
+
+```
+
+2.Make a histogram of the total number of steps taken each day
+
+```{r histogram, echo=TRUE}
+#cleaning data 
+steps_Day_NA <- is.na(steps_Day$total.Steps)
+steps_Day_clean <- steps_Day[!steps_Day_NA, ]
+#plot a histogram of cleaned data
+library(ggplot2)
+ggplot(steps_Day_clean, aes(x = steps_Day_clean$total.Steps)) + geom_histogram(fill = "orange", binwidth = 1000) +  labs(title = "Total Daily Steps", x = "Steps", y = "Frequency")
+
+```
+
+**3.Calculate and report the mean and median of the total number of steps taken per day**
+
+```{r meanChunk, echo=TRUE}
+mean(steps_Day_clean$total.Steps)
+```
+
+```{r medianChunk, echo=TRUE}
+median(steps_Day_clean$total.Steps)
+```
 
 
-## Loading and preprocessing the data
+##What is the average daily activity pattern?
+
+1.Time series plot of the average number of steps taken
+
+```{r daily_Activity, echo=TRUE}
+#cleaning raw_Data
+NA_Values <- is.na(raw_Data$steps)
+raw_Data_clean <- raw_Data[!NA_Values, ]
+#aggregate steps by intevals
+mean_steps_interval <- aggregate(raw_Data_clean$steps, by = list(raw_Data_clean$interval), mean)
+
+#defining new names
+names(mean_steps_interval) <- c("interval", "steps")
+
+#making a line plot
+ggplot(mean_steps_interval, aes(x = interval, y = steps)) + geom_line(color = "orange") + labs(title = "Sum of Steps by Interval", x = "interval", y = "steps")
+```
+
+**2.Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?**
+
+```{r max_Interval, echo=TRUE}
+max_Interval <- mean_steps_interval[which.max(mean_steps_interval$steps), ]
+max_Interval
+```
+
+##Imputing missing values
+
+1.Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+
+```{r NAs, echo=TRUE}
+sum(NA_Values)
+```
+
+2.Devise a strategy for filling in all of the missing values in the dataset.
+Strategy: Use mean interval steps from Mean Steps for that interval.
+
+```{r fillimgMissing, echo=TRUE}
+#new dataset
+raw_Data2 <- raw_Data
+
+#define missing values
+missing_values <- is.na(raw_Data2$steps)
+
+#calculate mean values for clean data
+mean_Values <- tapply(raw_Data_clean$steps, raw_Data_clean$interval, mean, na.rm=TRUE, simplify=TRUE)
+#rounding the mean values
+mean_Values <- round(mean_Values, 0)
+```
+
+3.Create a new dataset that is equal to the original dataset but with the missing data filled in.
+
+```{r newDataSet, echo=TRUE}
+#filling the missing values 
+raw_Data2$steps[missing_values] <- mean_Values[as.character(raw_Data2$interval[missing_values])]
+
+```
 
 
+```{r cmv, echo=TRUE}
+#count missing values 
+sum(is.na(raw_Data2$steps))
+```
+**output = 0, means that all missing data have fullfilled**
 
-## What is mean total number of steps taken per day?
+```{r showNewData, echo=TRUE}
+head(raw_Data2, 20)
+```
+
+4.Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+```{r newHistogram, echo=TRUE}
+newSteps_Day <- aggregate(raw_Data2$steps, by = list(raw_Data2$date), sum)
+names(newSteps_Day) <- c("date", "total.Steps")
+head(newSteps_Day, 20)
+```
+```{r NH, echo=TRUE}
+#plot histogram using ggplot2 package
+ggplot(newSteps_Day, aes(x = newSteps_Day$total.Steps)) + geom_histogram(fill = "orange", binwidth = 1000) + labs(title = "Total Daily Steps", x = "Steps", y = "Frequency")
+```
+
+```{r newMean, echo=TRUE}
+# Mean on New Data
+mean(newSteps_Day$total.Steps)
+```
 
 
+```{r newMedian, echo=TRUE}
+# Median on New Data
+median(newSteps_Day$total.Steps)
+```
 
-## What is the average daily activity pattern?
+**Original mean and median**
+
+```{r oriMean, echo=TRUE}
+mean(steps_Day$total.Steps, na.rm = T)
+```
+
+```{r oriMedian, echo=TRUE}
+median(steps_Day$total.Steps, na.rm = T)
+```
+
+values of mean and median has changed, new **mean** inceases with **8.02**.
 
 
+##Are there differences in activity patterns between weekdays and weekends?
 
-## Imputing missing values
+```{r dayType, echo=TRUE}
+#making a new factor variable with values weekday or weekend 
+raw_Data2$day.Type <- ifelse (weekdays(raw_Data2$date) == "Saturday" | weekdays(raw_Data2$date) == "Sunday", "Weekend", "Weekday")
+head(raw_Data2, 20)
+```
 
+```{r newPlot, echo=TRUE}
+#aggregating mean values for each day by day type, then by interval
+mean_steps_dayType_interval <- aggregate(raw_Data2$steps, by = list(raw_Data2$day.Type, raw_Data2$interval), mean)
 
+#new names
+names(mean_steps_dayType_interval) <- c("day.Type", "interval", "total.Steps")
+#using ggplot
+ggplot(mean_steps_dayType_interval, aes(x = interval, y = total.Steps, color = day.Type)) + geom_line() + facet_grid(day.Type ~ .) +  labs(title = "Mean of Steps by Interval", x = "interval", y = "steps")
 
-## Are there differences in activity patterns between weekdays and weekends?
+```
+There seems to be variation in beginning of **weekdays**, and an overall larger number of steps during **weekends**
+
+##by: Ahmed Talaat
+
